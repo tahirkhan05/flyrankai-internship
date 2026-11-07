@@ -14,6 +14,8 @@ This repository contains the sequential progression from an in-memory CRUD API t
   FastAPI application connected to a containerized PostgreSQL database with Docker Compose, environment secrets (`.env`), and persistent volume storage.
 - 📁 **[`04-auth-login-protect/`](./04-auth-login-protect)**: **Assignment A4 — Auth: Login & Protect**  
   Secure FastAPI authentication service using Supabase Auth (Sign Up, Log In, Log Out, JWT verification, protected route dependencies, and Swagger bearer auth).
+- 📁 **[`05-polite-scraper/`](./05-polite-scraper)**: **Assignment A5 (A9) — The Polite Scraper**  
+  Polite, robust web scraping pipeline targeting Books to Scrape using Requests, BeautifulSoup, and Pydantic with caching, rate limiting, and failure reporting.
 
 ---
 
