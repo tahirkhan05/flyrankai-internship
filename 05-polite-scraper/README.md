@@ -97,7 +97,7 @@ class BookRecord(BaseModel):
 ## 5. Politeness Rules
 
 1. **Honest User-Agent**: Every request identifies the crawler with a contact link:
-   `FlyRankInternship-A9/1.0 (+https://github.com/tahirkhan05/crud-api)`
+   `FlyRankInternship-A9/1.0 (+https://github.com/tahirkhan05/flyrankai-internship)`
 2. **Polite Delay**: Enforces at least `500 ms` delay (`time.sleep(0.5)`) between live HTTP requests to avoid hammering the site.
 3. **Local Cache First**: Every HTML page is saved to `cache/`. Subsequent runs use `CACHE HIT` with zero network requests and zero latency.
 4. **Timeout Enforced**: Every network request caps at `10s` (`timeout=10`) so the crawler never hangs indefinitely.

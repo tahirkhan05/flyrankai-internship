@@ -20,7 +20,7 @@ CACHE_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-USER_AGENT = "FlyRankInternship-A9/1.0 (+https://github.com/tahirkhan05/crud-api)"
+USER_AGENT = "FlyRankInternship-A9/1.0 (+https://github.com/tahirkhan05/flyrankai-internship)"
 HEADERS = {"User-Agent": USER_AGENT}
 TIMEOUT = 10
 POLITE_DELAY = 0.5  # seconds between live web requests

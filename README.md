@@ -1,4 +1,4 @@
-# FlyRank Internship · Backend Track
+# FlyRank AI Internship · AI Backend Engineer
 
 Welcome to the backend engineering projects for FlyRank Internship.
 
@@ -18,17 +18,3 @@ This repository contains the sequential progression from an in-memory CRUD API t
   Polite, robust web scraping pipeline targeting Books to Scrape using Requests, BeautifulSoup, and Pydantic with caching, rate limiting, and failure reporting.
 
 ---
-
-## Getting Started
-
-### Run the Containerized Stack (Assignment A3)
-Start the entire API and PostgreSQL database with one command:
-
-```bash
-cd 03-containerize-stack
-cp .env.example .env
-docker compose up --build
-```
-
-Interactive API documentation will be available at:  
-👉 **[http://localhost:8000/docs](http://localhost:8000/docs)**
