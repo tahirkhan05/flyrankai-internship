@@ -96,71 +96,62 @@ def get_task(id: int):
 
 @app.post("/tasks", status_code=201)
 def create_task(task_input: TaskCreate):
-    """Create a new task in the SQLite database."""
+    """Create a new task in PostgreSQL using RETURNING clause."""
     if not task_input.title or not task_input.title.strip():
         return JSONResponse(status_code=400, content={"error": "Title is required and cannot be empty"})
 
     title = task_input.title.strip()
 
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)", (title, 0))
-    conn.commit()
-    new_id = cursor.lastrowid
-    conn.close()
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO tasks (title, done) VALUES (%s, %s) RETURNING id, title, done",
+                (title, False),
+            )
+            new_task = cursor.fetchone()
+        conn.commit()
 
-    return {
-        "id": new_id,
-        "title": title,
-        "done": False,
-    }
+    return new_task
 
 
 @app.put("/tasks/{id}")
 def update_task(id: int, task_input: TaskUpdate):
-    """Update an existing task's title or status using parameterized SQL."""
+    """Update task title or status in PostgreSQL using parameterized query."""
     if task_input.title is None and task_input.done is None:
         return JSONResponse(status_code=400, content={"error": "Body cannot be empty; provide title and/or done"})
     if task_input.title is not None and not task_input.title.strip():
         return JSONResponse(status_code=400, content={"error": "Title cannot be empty"})
 
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT id, title, done FROM tasks WHERE id = %s", (id,))
+            existing = cursor.fetchone()
+            if existing is None:
+                return JSONResponse(status_code=404, content={"error": "Task not found"})
 
-    cursor.execute("SELECT id, title, done FROM tasks WHERE id = ?", (id,))
-    existing = cursor.fetchone()
-    if existing is None:
-        conn.close()
-        return JSONResponse(status_code=404, content={"error": "Task not found"})
+            new_title = task_input.title.strip() if task_input.title is not None else existing["title"]
+            new_done = task_input.done if task_input.done is not None else existing["done"]
 
-    new_title = task_input.title.strip() if task_input.title is not None else existing["title"]
-    new_done = int(task_input.done) if task_input.done is not None else existing["done"]
+            cursor.execute(
+                "UPDATE tasks SET title = %s, done = %s WHERE id = %s RETURNING id, title, done",
+                (new_title, new_done, id),
+            )
+            updated_task = cursor.fetchone()
+        conn.commit()
 
-    cursor.execute(
-        "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
-        (new_title, new_done, id)
-    )
-    conn.commit()
-    conn.close()
-
-    return {
-        "id": id,
-        "title": new_title,
-        "done": bool(new_done)
-    }
+    return updated_task
 
 
 @app.delete("/tasks/{id}")
 def delete_task(id: int):
-    """Delete a task by ID using parameterized SQL."""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM tasks WHERE id = ?", (id,))
-    conn.commit()
-    deleted_rows = cursor.rowcount
-    conn.close()
+    """Delete a task by ID from PostgreSQL."""
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM tasks WHERE id = %s", (id,))
+            deleted_count = cursor.rowcount
+        conn.commit()
 
-    if deleted_rows == 0:
+    if deleted_count == 0:
         return JSONResponse(status_code=404, content={"error": "Task not found"})
 
     return Response(status_code=204)
