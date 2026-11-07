@@ -98,7 +98,7 @@ def public_info():
 
 @app.get("/protected/profile")
 def profile(authorization: Optional[str] = Header(None)):
-    """Protected endpoint requiring an Authorization: Bearer <token> header."""
+    """Protected profile endpoint that verifies the JWT token with Supabase."""
     if not authorization or not authorization.startswith("Bearer "):
         return JSONResponse(status_code=401, content={"error": "Access token required"})
 
@@ -106,8 +106,17 @@ def profile(authorization: Optional[str] = Header(None)):
     if not token:
         return JSONResponse(status_code=401, content={"error": "Access token required"})
 
-    return {
-        "message": "Token presented (unverified in Stage 2)",
-        "token_preview": token[:15] + "..."
-    }
+    try:
+        user_response = supabase.auth.get_user(token)
+        if not user_response or not user_response.user:
+            return JSONResponse(status_code=401, content={"error": "Invalid or expired token"})
+
+        user = user_response.user
+        return {
+            "id": user.id,
+            "email": user.email,
+            "created_at": str(user.created_at)
+        }
+    except Exception:
+        return JSONResponse(status_code=401, content={"error": "Invalid or expired token"})
 
