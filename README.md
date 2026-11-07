@@ -10,6 +10,8 @@ This repository contains the sequential progression from an in-memory CRUD API t
   FastAPI application using in-memory state, input validation, and REST conventions.
 - 📁 **[`connect-crud-to-db/`](./connect-crud-to-db)**: **Assignment A2 — Connecting your CRUD to the database**  
   FastAPI application backed by a persistent SQLite database (`tasks.db`) with parameterized SQL queries, automated table creation, idempotent seeding, and restart survival.
+- 📁 **[`containerize-stack/`](./containerize-stack)**: **Assignment A3 — Containerize your stack**  
+  FastAPI application connected to a containerized PostgreSQL database with Docker Compose, environment secrets (`.env`), and persistent volume storage.
 
 ---
 
