@@ -6,18 +6,53 @@ Target: Books to Scrape (https://books.toscrape.com)
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 import time
+from typing import Optional
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
+from pydantic import BaseModel, ValidationError, field_validator
 import requests
 
 CACHE_DIR = Path(__file__).parent / "cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
+OUTPUT_DIR = Path(__file__).parent / "output"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
 USER_AGENT = "FlyRankInternship-A9/1.0 (+https://github.com/tahirkhan05/crud-api)"
 HEADERS = {"User-Agent": USER_AGENT}
 TIMEOUT = 10
 POLITE_DELAY = 0.5  # seconds between live web requests
+
+
+class BookRecord(BaseModel):
+    """Validated schema for a scraped book record."""
+
+    title: str
+    product_url: str
+    price_text: str
+    price_gbp: float
+    availability_text: str
+    rating_text: str
+    description: Optional[str] = None
+    source_page: str
+    fetched_at: str
+
+    @field_validator("product_url")
+    @classmethod
+    def must_be_https(cls, v: str) -> str:
+        if not v.startswith("https://"):
+            raise ValueError("product_url must start with https://")
+        return v
+
+
+def clean_price(price_text: str) -> float:
+    """Normalize raw price string (e.g. '£51.77') into a floating point number (51.77)."""
+    match = re.search(r"[\d.]+", price_text)
+    if not match:
+        raise ValueError(f"Could not extract numeric price from: {price_text}")
+    return float(match.group())
 
 
 def fetch_page(url: str, cache_filename: str) -> tuple[str, str]:
@@ -143,19 +178,48 @@ def main():
     start_url = "https://books.toscrape.com/catalogue/page-1.html"
     books = discover_books(start_url, max_pages=3)
 
-    raw_records = []
+    valid_books = {}  # canonical product_url -> BookRecord (idempotent dict)
+    errors = []
+
     for url, source_page in books.items():
         slug = url.rstrip("/").split("/")[-2]
         cache_file = f"book-{slug}.html"
         html, fetched_at = fetch_page(url, cache_file)
-        record = extract_book_details(html, url, source_page, fetched_at)
-        raw_records.append(record)
 
-    # Checkpoint Stage 3: print one complete raw record and summary
-    if raw_records:
-        print("\nSample Raw Record:")
-        print(json.dumps(raw_records[0], indent=2, ensure_ascii=False))
-    print(f"\ndetail_pages={len(raw_records)}")
+        raw_data = extract_book_details(html, url, source_page, fetched_at)
+
+        try:
+            price_gbp = clean_price(raw_data["price_text"])
+            record_dict = {**raw_data, "price_gbp": price_gbp}
+            validated = BookRecord(**record_dict)
+            valid_books[validated.product_url] = validated.model_dump()
+        except (ValidationError, ValueError) as err:
+            errors.append({"record": raw_data, "error": str(err)})
+
+    # Write validated records to output/books.json
+    books_file = OUTPUT_DIR / "books.json"
+    books_file.write_text(
+        json.dumps(list(valid_books.values()), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    # Write error records to output/errors.json
+    errors_file = OUTPUT_DIR / "errors.json"
+    errors_file.write_text(
+        json.dumps(errors, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # Stage 4 Checkpoint verification
+    loaded_books = json.loads(books_file.read_text(encoding="utf-8"))
+    all_prices_numeric = all(
+        isinstance(b["price_gbp"], (int, float)) for b in loaded_books
+    )
+    all_urls_https = all(b["product_url"].startswith("https://") for b in loaded_books)
+
+    print(f"\nbooks.json count: {len(loaded_books)}")
+    print(f"All price_gbp numeric: {all_prices_numeric}")
+    print(f"All product_url start with https://: {all_urls_https}")
+    print(f"errors.json count: {len(errors)}")
 
 
 if __name__ == "__main__":
