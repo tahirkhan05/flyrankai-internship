@@ -12,6 +12,8 @@ This repository contains the sequential progression from an in-memory CRUD API t
   FastAPI application backed by a persistent SQLite database (`tasks.db`) with parameterized SQL queries, automated table creation, idempotent seeding, and restart survival.
 - 📁 **[`03-containerize-stack/`](./03-containerize-stack)**: **Assignment A3 — Containerize your stack**  
   FastAPI application connected to a containerized PostgreSQL database with Docker Compose, environment secrets (`.env`), and persistent volume storage.
+- 📁 **[`04-auth-login-protect/`](./04-auth-login-protect)**: **Assignment A4 — Auth: Login & Protect**  
+  Secure FastAPI authentication service using Supabase Auth (Sign Up, Log In, Log Out, JWT verification, protected route dependencies, and Swagger bearer auth).
 
 ---
 
