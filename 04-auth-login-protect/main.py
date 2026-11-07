@@ -1,7 +1,10 @@
 import os
 from pathlib import Path
+from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from supabase import create_client, Client
 
 # Load environment variables from .env
@@ -22,6 +25,11 @@ else:
 app = FastAPI(title="Supabase Auth API")
 
 
+class AuthRequest(BaseModel):
+    email: Optional[str] = None
+    password: Optional[str] = None
+
+
 @app.get("/")
 def root():
     return {
@@ -29,4 +37,55 @@ def root():
         "status": "online",
         "connected_to_supabase": supabase is not None
     }
+
+
+@app.post("/auth/signup", status_code=201)
+def signup(credentials: AuthRequest):
+    """Register a new user account with Supabase Auth."""
+    if not credentials.email or not credentials.email.strip():
+        return JSONResponse(status_code=400, content={"error": "Email is required"})
+    if not credentials.password or not credentials.password.strip():
+        return JSONResponse(status_code=400, content={"error": "Password is required"})
+
+    try:
+        response = supabase.auth.sign_up({
+            "email": credentials.email.strip(),
+            "password": credentials.password.strip()
+        })
+        if not response.user:
+            return JSONResponse(status_code=400, content={"error": "Signup failed"})
+
+        return {
+            "id": response.user.id,
+            "email": response.user.email,
+            "created_at": str(response.user.created_at)
+        }
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@app.post("/auth/login")
+def login(credentials: AuthRequest):
+    """Authenticate credentials with Supabase Auth and return JWT tokens."""
+    if not credentials.email or not credentials.email.strip():
+        return JSONResponse(status_code=400, content={"error": "Email is required"})
+    if not credentials.password or not credentials.password.strip():
+        return JSONResponse(status_code=400, content={"error": "Password is required"})
+
+    try:
+        response = supabase.auth.sign_in_with_password({
+            "email": credentials.email.strip(),
+            "password": credentials.password.strip()
+        })
+        if not response.session:
+            return JSONResponse(status_code=401, content={"error": "Invalid login credentials"})
+
+        return {
+            "access_token": response.session.access_token,
+            "refresh_token": response.session.refresh_token,
+            "token_type": "bearer",
+            "expires_in": response.session.expires_in
+        }
+    except Exception:
+        return JSONResponse(status_code=401, content={"error": "Invalid login credentials"})
 
