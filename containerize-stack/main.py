@@ -1,44 +1,50 @@
-import sqlite3
+import os
 from pathlib import Path
 from typing import Optional
+from dotenv import load_dotenv
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+import psycopg
+from psycopg.rows import dict_row
+
+# Load environment secrets from .env
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:dev@localhost:5432/tasks")
 
 app = FastAPI()
 
-DB_PATH = Path(__file__).parent / "tasks.db"
-
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Connect to PostgreSQL using DATABASE_URL from environment."""
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 def init_db():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            done INTEGER NOT NULL DEFAULT 0
-        )
-    """)
-    conn.commit()
+    """Create tasks table if missing and seed starter tasks on empty count."""
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    done BOOLEAN NOT NULL DEFAULT FALSE
+                )
+            """)
+            cursor.execute("SELECT COUNT(*) FROM tasks")
+            count = cursor.fetchone()["count"]
 
-    # Seed only if the table is empty
-    cursor.execute("SELECT COUNT(*) FROM tasks")
-    count = cursor.fetchone()[0]
-    if count == 0:
-        seed_tasks = [
-            ("Set up project", 1),
-            ("Build Stage 2 endpoints", 0),
-            ("Write documentation", 0)
-        ]
-        cursor.executemany("INSERT INTO tasks (title, done) VALUES (?, ?)", seed_tasks)
+            if count == 0:
+                seed_tasks = [
+                    ("Set up project", True),
+                    ("Build Stage 2 endpoints", False),
+                    ("Write documentation", False),
+                ]
+                cursor.executemany(
+                    "INSERT INTO tasks (title, done) VALUES (%s, %s)",
+                    seed_tasks,
+                )
         conn.commit()
-
-    conn.close()
 
 # Run database setup on startup
 init_db()
