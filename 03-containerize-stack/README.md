@@ -1,6 +1,6 @@
 # Containerized Task API (PostgreSQL + Docker Compose)
 
-FlyRank Internship Backend Track · Week 1 · Assignment A3
+FlyRank AI Internship · AI Backend Engineer · Assignment A3
 
 A complete containerized RESTful Task CRUD API running against a real **PostgreSQL** database inside Docker, managed via **Docker Compose** and configured with environment secrets.
 

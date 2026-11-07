@@ -1,6 +1,6 @@
 # Supabase Auth: Login & Protect
 
-FlyRank Internship Backend Track · Week 2 · Assignment A4
+FlyRank AI Internship · AI Backend Engineer · Assignment A4
 
 A secure RESTful authentication service built with **FastAPI** and backed by **Supabase Auth** as the external Identity Provider (IdP). Features user registration, credential authentication, JWT token issuance, Bearer token verification middleware, and interactive Swagger UI bearer authorization.
 

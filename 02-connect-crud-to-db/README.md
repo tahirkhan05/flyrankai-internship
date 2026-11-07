@@ -1,5 +1,7 @@
 # Task CRUD API with SQLite Database Persistence
 
+FlyRank AI Internship · AI Backend Engineer · Assignment A2
+
 The database-backed sequel to Assignment 1. Replaces the temporary in-memory list with an embedded **SQLite** database (`tasks.db`). The public API contract, endpoints, status codes, and JSON responses remain identical, but all task data now permanently survives server restarts.
 
 ---

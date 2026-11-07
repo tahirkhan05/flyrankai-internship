@@ -1,4 +1,4 @@
--- FlyRank Internship Backend Track · Week 3 · Assignment A2
+-- FlyRank AI Internship · AI Backend Engineer · Assignment A2
 -- Stage 4: Learn your first SQL by hand
 
 -- 1. List every task in the database

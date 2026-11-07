@@ -1,6 +1,6 @@
 # FlyRank AI Internship · AI Backend Engineer
 
-Welcome to the backend engineering projects for FlyRank Internship.
+Welcome to the backend engineering projects for the **FlyRank AI Internship — AI Backend Engineer** track.
 
 ## Project Structure
 

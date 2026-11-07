@@ -1,5 +1,7 @@
 # Task CRUD API
 
+FlyRank AI Internship · AI Backend Engineer · Assignment A1
+
 A lightweight RESTful CRUD API built with Python and FastAPI to manage tasks. All data lives in-memory with zero database dependencies, adhering to REST standards, clear HTTP status codes, and input validation.
 
 ---

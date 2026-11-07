@@ -1,6 +1,6 @@
 # The Polite Scraper
 
-FlyRank Internship Backend Track · Week 5 · Assignment A9
+FlyRank AI Internship · AI Backend Engineer · Assignment A5 (A9)
 
 A small, reliable, polite web scraping pipeline built in Python: downloads the first three catalogue pages of Books to Scrape, visits all 60 book pages, normalizes messy HTML into clean, validated JSON records, survives broken pages without crashing, and generates an honest run report.
 
