@@ -20,3 +20,4 @@ UPDATE tasks SET done = 1;
 -- 5. Delete all completed tasks
 DELETE FROM tasks WHERE done = 1;
 -- Result: Deletes all rows where done = 1 (empty table if all were done)
+

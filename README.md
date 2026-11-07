@@ -25,3 +25,4 @@ uvicorn main:app --reload
 
 Interactive API documentation will be available at:  
 👉 **[http://localhost:8000/docs](http://localhost:8000/docs)**
+

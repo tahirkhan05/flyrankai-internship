@@ -80,13 +80,11 @@ Additional hand-tested queries are documented in [`queries.sql`](./queries.sql).
 
 ---
 
-## 6. Database Inspection (DB Browser for SQLite)
+## 6. Database Inspection (SQLite Viewer)
 
-Open `tasks.db` inside **DB Browser for SQLite** to view the `tasks` table and rows visually:
+Viewing the persistent `tasks` table and seeded records directly inside `tasks.db`:
 
-![DB Browser for SQLite Screenshot](db_browser.png)
-
-*(To generate your screenshot: open `tasks.db` in [DB Browser for SQLite](https://sqlitebrowser.org/), navigate to the "Browse Data" tab, capture a screenshot, and save it as `connect-crud-to-db/db_browser.png`).*
+![SQLite Database Viewer Screenshot](db_browser.png)
 
 ---
 
@@ -132,3 +130,4 @@ curl.exe -i -X DELETE http://localhost:8000/tasks/1
 # Verify deletion (404 Not Found)
 curl.exe -i http://localhost:8000/tasks/1
 ```
+
