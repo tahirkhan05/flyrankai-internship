@@ -71,31 +71,27 @@ def health():
 
 @app.get("/tasks")
 def get_tasks():
-    """List all tasks from the SQLite database."""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, title, done FROM tasks")
-    rows = cursor.fetchall()
-    conn.close()
-    return [
-        {"id": row["id"], "title": row["title"], "done": bool(row["done"])}
-        for row in rows
-    ]
+    """List all tasks from PostgreSQL."""
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT id, title, done FROM tasks")
+            rows = cursor.fetchall()
+            return [
+                {"id": row["id"], "title": row["title"], "done": row["done"]}
+                for row in rows
+            ]
 
 
 @app.get("/tasks/{id}")
 def get_task(id: int):
-    """Get a single task by ID using a parameterized query."""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, title, done FROM tasks WHERE id = ?", (id,))
-    row = cursor.fetchone()
-    conn.close()
-
-    if row is None:
-        return JSONResponse(status_code=404, content={"error": "Task not found"})
-
-    return {"id": row["id"], "title": row["title"], "done": bool(row["done"])}
+    """Retrieve a single task by ID from PostgreSQL using a parameterized query."""
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT id, title, done FROM tasks WHERE id = %s", (id,))
+            row = cursor.fetchone()
+            if row is None:
+                return JSONResponse(status_code=404, content={"error": "Task not found"})
+            return {"id": row["id"], "title": row["title"], "done": row["done"]}
 
 
 @app.post("/tasks", status_code=201)
