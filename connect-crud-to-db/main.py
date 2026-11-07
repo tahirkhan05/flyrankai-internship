@@ -43,13 +43,6 @@ def init_db():
 # Run database setup on startup
 init_db()
 
-# In-memory tasks list from Assignment 1 (will be replaced stage by stage)
-tasks = [
-    {"id": 1, "title": "Set up project", "done": True},
-    {"id": 2, "title": "Build Stage 2 endpoints", "done": False},
-    {"id": 3, "title": "Write documentation", "done": False},
-]
-
 class TaskCreate(BaseModel):
     title: Optional[str] = None
 
@@ -123,29 +116,49 @@ def create_task(task_input: TaskCreate):
 
 @app.put("/tasks/{id}")
 def update_task(id: int, task_input: TaskUpdate):
-    """Update an existing task's title or status."""
-    for task in tasks:
-        if task["id"] == id:
-            if task_input.title is None and task_input.done is None:
-                return JSONResponse(status_code=400, content={"error": "Body cannot be empty; provide title and/or done"})
-            if task_input.title is not None and not task_input.title.strip():
-                return JSONResponse(status_code=400, content={"error": "Title cannot be empty"})
+    """Update an existing task's title or status using parameterized SQL."""
+    if task_input.title is None and task_input.done is None:
+        return JSONResponse(status_code=400, content={"error": "Body cannot be empty; provide title and/or done"})
+    if task_input.title is not None and not task_input.title.strip():
+        return JSONResponse(status_code=400, content={"error": "Title cannot be empty"})
 
-            if task_input.title is not None:
-                task["title"] = task_input.title.strip()
-            if task_input.done is not None:
-                task["done"] = task_input.done
-            return task
+    conn = get_db()
+    cursor = conn.cursor()
 
-    return JSONResponse(status_code=404, content={"error": f"Task {id} not found"})
+    cursor.execute("SELECT id, title, done FROM tasks WHERE id = ?", (id,))
+    existing = cursor.fetchone()
+    if existing is None:
+        conn.close()
+        return JSONResponse(status_code=404, content={"error": "Task not found"})
+
+    new_title = task_input.title.strip() if task_input.title is not None else existing["title"]
+    new_done = int(task_input.done) if task_input.done is not None else existing["done"]
+
+    cursor.execute(
+        "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
+        (new_title, new_done, id)
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "id": id,
+        "title": new_title,
+        "done": bool(new_done)
+    }
 
 
 @app.delete("/tasks/{id}")
 def delete_task(id: int):
-    """Delete a task by ID."""
-    for i, task in enumerate(tasks):
-        if task["id"] == id:
-            tasks.pop(i)
-            return Response(status_code=204)
+    """Delete a task by ID using parameterized SQL."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM tasks WHERE id = ?", (id,))
+    conn.commit()
+    deleted_rows = cursor.rowcount
+    conn.close()
 
-    return JSONResponse(status_code=404, content={"error": f"Task {id} not found"})
+    if deleted_rows == 0:
+        return JSONResponse(status_code=404, content={"error": "Task not found"})
+
+    return Response(status_code=204)
