@@ -2,8 +2,9 @@ import os
 from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, Depends, HTTPException, Response
+from fastapi import FastAPI, Depends, HTTPException, Response
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from supabase import create_client, Client
 
@@ -24,6 +25,9 @@ else:
 
 app = FastAPI(title="Supabase Auth API")
 
+# OpenAPI HTTPBearer security scheme for Swagger UI padlock
+security = HTTPBearer(auto_error=False)
+
 
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request, exc):
@@ -31,12 +35,12 @@ async def custom_http_exception_handler(request, exc):
     return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
 
 
-def get_current_user(authorization: Optional[str] = Header(None)):
-    """Reusable auth dependency: extracts and verifies JWT bearer token with Supabase."""
-    if not authorization or not authorization.startswith("Bearer "):
+def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+    """Reusable auth dependency: extracts bearer token and verifies with Supabase."""
+    if not credentials or not credentials.credentials:
         raise HTTPException(status_code=401, detail="Access token required")
 
-    token = authorization.split("Bearer ", 1)[1].strip()
+    token = credentials.credentials.strip()
     if not token:
         raise HTTPException(status_code=401, detail="Access token required")
 
