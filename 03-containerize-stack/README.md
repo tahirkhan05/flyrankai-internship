@@ -141,7 +141,7 @@ Data is persisted on disk via the Docker named volume `taskdata`:
 A collaborator cloning this repository can run the whole stack in under 2 minutes:
 
 ```bash
-cd containerize-stack
+cd 03-containerize-stack
 cp .env.example .env
 docker compose up --build
 ```
