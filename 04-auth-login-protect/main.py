@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, Depends, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from supabase import create_client, Client
@@ -23,6 +23,32 @@ else:
     print("Notice: Set SUPABASE_URL and SUPABASE_KEY in .env to connect to Supabase")
 
 app = FastAPI(title="Supabase Auth API")
+
+
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request, exc):
+    """Ensure all auth error responses match the required JSON format: {'error': '...'}"""
+    return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
+
+
+def get_current_user(authorization: Optional[str] = Header(None)):
+    """Reusable auth dependency: extracts and verifies JWT bearer token with Supabase."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Access token required")
+
+    token = authorization.split("Bearer ", 1)[1].strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Access token required")
+
+    try:
+        user_response = supabase.auth.get_user(token)
+        if not user_response or not user_response.user:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        return user_response.user
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
 class AuthRequest(BaseModel):
@@ -97,26 +123,27 @@ def public_info():
 
 
 @app.get("/protected/profile")
-def profile(authorization: Optional[str] = Header(None)):
-    """Protected profile endpoint that verifies the JWT token with Supabase."""
-    if not authorization or not authorization.startswith("Bearer "):
-        return JSONResponse(status_code=401, content={"error": "Access token required"})
+def profile(current_user = Depends(get_current_user)):
+    """Read private profile data for the authenticated user."""
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "created_at": str(current_user.created_at)
+    }
 
-    token = authorization.split("Bearer ", 1)[1].strip()
-    if not token:
-        return JSONResponse(status_code=401, content={"error": "Access token required"})
 
-    try:
-        user_response = supabase.auth.get_user(token)
-        if not user_response or not user_response.user:
-            return JSONResponse(status_code=401, content={"error": "Invalid or expired token"})
+@app.post("/auth/logout", status_code=204)
+def logout(current_user = Depends(get_current_user)):
+    """End the user's session in Supabase Auth."""
+    supabase.auth.sign_out()
+    return Response(status_code=204)
 
-        user = user_response.user
-        return {
-            "id": user.id,
-            "email": user.email,
-            "created_at": str(user.created_at)
-        }
-    except Exception:
-        return JSONResponse(status_code=401, content={"error": "Invalid or expired token"})
+
+@app.get("/protected/dashboard")
+def dashboard(current_user = Depends(get_current_user)):
+    """Second protected endpoint proving reusable auth middleware."""
+    return {
+        "message": f"Welcome to your private dashboard, {current_user.email}!",
+        "user_id": current_user.id
+    }
 
