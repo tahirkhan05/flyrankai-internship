@@ -101,18 +101,24 @@ def get_task(id: int):
 
 @app.post("/tasks", status_code=201)
 def create_task(task_input: TaskCreate):
-    """Create a new task."""
+    """Create a new task in the SQLite database."""
     if not task_input.title or not task_input.title.strip():
         return JSONResponse(status_code=400, content={"error": "Title is required and cannot be empty"})
 
-    new_id = max([t["id"] for t in tasks], default=0) + 1
-    new_task = {
+    title = task_input.title.strip()
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO tasks (title, done) VALUES (?, ?)", (title, 0))
+    conn.commit()
+    new_id = cursor.lastrowid
+    conn.close()
+
+    return {
         "id": new_id,
-        "title": task_input.title.strip(),
+        "title": title,
         "done": False,
     }
-    tasks.append(new_task)
-    return new_task
 
 
 @app.put("/tasks/{id}")
