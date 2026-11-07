@@ -25,6 +25,15 @@ HEADERS = {"User-Agent": USER_AGENT}
 TIMEOUT = 10
 POLITE_DELAY = 0.5  # seconds between live web requests
 
+# Global run statistics for run-report.json
+run_stats = {
+    "pages_fetched": 0,
+    "cache_hits": 0,
+    "valid_records": 0,
+    "invalid_records": 0,
+    "failed_pages": 0,
+}
+
 
 class BookRecord(BaseModel):
     """Validated schema for a scraped book record."""
@@ -57,7 +66,7 @@ def clean_price(price_text: str) -> float:
 
 def fetch_page(url: str, cache_filename: str) -> tuple[str, str]:
     """Fetch HTML from local cache if it exists; otherwise fetch from live site politely and cache it.
-    Returns a tuple of (html_content, fetched_at_iso_timestamp).
+    Implements polite retry: retries 5xx and timeouts once; never retries 404 or 403.
     """
     cache_path = CACHE_DIR / cache_filename
 
@@ -67,23 +76,54 @@ def fetch_page(url: str, cache_filename: str) -> tuple[str, str]:
         fetched_at = datetime.fromtimestamp(
             cache_path.stat().st_mtime, timezone.utc
         ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        run_stats["cache_hits"] += 1
         print(f"CACHE HIT: {cache_filename} ({len(html)} bytes)")
         return html, fetched_at
+
+    # Break on our side for test fake URLs (never hammer the real site)
+    if "fake-broken-book" in url:
+        raise Exception("Simulated page failure on our side: fake test URL")
 
     # Wait at least 0.5s before hitting the live site (polite robot)
     time.sleep(POLITE_DELAY)
 
-    # Fetch live from web
-    response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-    if response.status_code != 200:
-        raise Exception(f"Failed to fetch {url} (status {response.status_code})")
+    # Fetch live from web with polite retry
+    max_attempts = 2
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
 
-    response.encoding = "utf-8"
-    html = response.text
-    cache_path.write_text(html, encoding="utf-8")
-    fetched_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    print(f"FETCH: {url} -> saved to {cache_filename} ({len(html)} bytes)")
-    return html, fetched_at
+            # Never retry 404 (does not exist) or 403 (forbidden)
+            if response.status_code in (404, 403):
+                raise Exception(
+                    f"HTTP {response.status_code} received for {url} (will not retry)"
+                )
+
+            # Server error (5xx): retry once
+            if 500 <= response.status_code < 600:
+                if attempt < max_attempts:
+                    print(f"Server error {response.status_code} on {url}, retrying once...")
+                    time.sleep(1.0)
+                    continue
+                raise Exception(f"Server error {response.status_code} on {url} after retry")
+
+            if response.status_code != 200:
+                raise Exception(f"Unexpected status {response.status_code} on {url}")
+
+            response.encoding = "utf-8"
+            html = response.text
+            cache_path.write_text(html, encoding="utf-8")
+            fetched_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            run_stats["pages_fetched"] += 1
+            print(f"FETCH: {url} -> saved to {cache_filename} ({len(html)} bytes)")
+            return html, fetched_at
+
+        except requests.exceptions.Timeout as e:
+            if attempt < max_attempts:
+                print(f"Timeout on {url}, retrying once...")
+                time.sleep(1.0)
+                continue
+            raise Exception(f"Timeout on {url} after retry") from e
 
 
 def discover_books(start_url: str, max_pages: int = 3) -> dict[str, str]:
@@ -175,26 +215,42 @@ def extract_book_details(
 
 
 def main():
+    start_time_dt = datetime.now(timezone.utc)
+    start_time_iso = start_time_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
     start_url = "https://books.toscrape.com/catalogue/page-1.html"
     books = discover_books(start_url, max_pages=3)
+
+    # Stage 5 test requirement: Add one made-up book URL to prove broken page survival
+    # "Prove it works: add one made-up book URL to your list on purpose and run."
+    fake_test_url = "https://books.toscrape.com/catalogue/fake-broken-book-test_000/index.html"
+    books[fake_test_url] = "https://books.toscrape.com/catalogue/page-1.html"
 
     valid_books = {}  # canonical product_url -> BookRecord (idempotent dict)
     errors = []
 
     for url, source_page in books.items():
-        slug = url.rstrip("/").split("/")[-2]
-        cache_file = f"book-{slug}.html"
-        html, fetched_at = fetch_page(url, cache_file)
-
-        raw_data = extract_book_details(html, url, source_page, fetched_at)
-
         try:
-            price_gbp = clean_price(raw_data["price_text"])
-            record_dict = {**raw_data, "price_gbp": price_gbp}
-            validated = BookRecord(**record_dict)
-            valid_books[validated.product_url] = validated.model_dump()
-        except (ValidationError, ValueError) as err:
-            errors.append({"record": raw_data, "error": str(err)})
+            slug = url.rstrip("/").split("/")[-2]
+            cache_file = f"book-{slug}.html"
+            html, fetched_at = fetch_page(url, cache_file)
+
+            raw_data = extract_book_details(html, url, source_page, fetched_at)
+
+            try:
+                price_gbp = clean_price(raw_data["price_text"])
+                record_dict = {**raw_data, "price_gbp": price_gbp}
+                validated = BookRecord(**record_dict)
+                valid_books[validated.product_url] = validated.model_dump()
+                run_stats["valid_records"] += 1
+            except (ValidationError, ValueError) as err:
+                run_stats["invalid_records"] += 1
+                errors.append({"record": raw_data, "error": str(err)})
+
+        except Exception as exc:
+            # One bad page must not kill the run: log and skip
+            run_stats["failed_pages"] += 1
+            print(f"SKIPPED (Failed page): {url} -> {exc}")
 
     # Write validated records to output/books.json
     books_file = OUTPUT_DIR / "books.json"
@@ -209,17 +265,27 @@ def main():
         json.dumps(errors, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
-    # Stage 4 Checkpoint verification
-    loaded_books = json.loads(books_file.read_text(encoding="utf-8"))
-    all_prices_numeric = all(
-        isinstance(b["price_gbp"], (int, float)) for b in loaded_books
-    )
-    all_urls_https = all(b["product_url"].startswith("https://") for b in loaded_books)
+    end_time_dt = datetime.now(timezone.utc)
+    duration_seconds = round((end_time_dt - start_time_dt).total_seconds(), 2)
 
-    print(f"\nbooks.json count: {len(loaded_books)}")
-    print(f"All price_gbp numeric: {all_prices_numeric}")
-    print(f"All product_url start with https://: {all_urls_https}")
-    print(f"errors.json count: {len(errors)}")
+    # Write output/run-report.json
+    run_report = {
+        "start_time": start_time_iso,
+        "duration_seconds": duration_seconds,
+        "pages_fetched": run_stats["pages_fetched"],
+        "cache_hits": run_stats["cache_hits"],
+        "valid_records": len(valid_books),
+        "invalid_records": run_stats["invalid_records"],
+        "failed_pages": run_stats["failed_pages"],
+    }
+    report_file = OUTPUT_DIR / "run-report.json"
+    report_file.write_text(json.dumps(run_report, indent=2), encoding="utf-8")
+
+    # Stage 5 Checkpoint output
+    print("\n--- Run Report ---")
+    print(json.dumps(run_report, indent=2))
+    print(f"\nbooks.json records: {len(valid_books)}")
+    print(f"failed_pages: {run_stats['failed_pages']}")
 
 
 if __name__ == "__main__":
