@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
 from typing import Optional
 from pydantic import BaseModel
@@ -53,3 +53,39 @@ def create_task(task_input: TaskCreate):
     # 4. Add to list and return
     tasks.append(new_task)
     return new_task
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    done: Optional[bool] = None
+
+@app.put("/tasks/{id}")
+def update_task(id: int, task_input: TaskUpdate):
+    # 1. Find the task
+    for task in tasks:
+        if task["id"] == id:
+            # 2. Validate: empty body or blank title check
+            if task_input.title is None and task_input.done is None:
+                return JSONResponse(status_code=400, content={"error": "Body cannot be empty; provide title and/or done"})
+            if task_input.title is not None and not task_input.title.strip():
+                return JSONResponse(status_code=400, content={"error": "Title cannot be empty"})
+
+            # 3. Update fields if provided
+            if task_input.title is not None:
+                task["title"] = task_input.title.strip()
+            if task_input.done is not None:
+                task["done"] = task_input.done
+
+            return task
+
+    # 4. Unknown id -> 404
+    return JSONResponse(status_code=404, content={"error": f"Task {id} not found"})
+
+
+@app.delete("/tasks/{id}")
+def delete_task(id: int):
+    for i, task in enumerate(tasks):
+        if task["id"] == id:
+            tasks.pop(i)
+            return Response(status_code=204)
+
+    return JSONResponse(status_code=404, content={"error": f"Task {id} not found"})
