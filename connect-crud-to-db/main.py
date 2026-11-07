@@ -1,10 +1,49 @@
+import sqlite3
+from pathlib import Path
+from typing import Optional
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
-from typing import Optional
 from pydantic import BaseModel
 
 app = FastAPI()
 
+DB_PATH = Path(__file__).parent / "tasks.db"
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            done INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    conn.commit()
+
+    # Seed only if the table is empty
+    cursor.execute("SELECT COUNT(*) FROM tasks")
+    count = cursor.fetchone()[0]
+    if count == 0:
+        seed_tasks = [
+            ("Set up project", 1),
+            ("Build Stage 2 endpoints", 0),
+            ("Write documentation", 0)
+        ]
+        cursor.executemany("INSERT INTO tasks (title, done) VALUES (?, ?)", seed_tasks)
+        conn.commit()
+
+    conn.close()
+
+# Run database setup on startup
+init_db()
+
+# In-memory tasks list from Assignment 1 (will be replaced stage by stage)
 tasks = [
     {"id": 1, "title": "Set up project", "done": True},
     {"id": 2, "title": "Build Stage 2 endpoints", "done": False},
