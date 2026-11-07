@@ -33,3 +33,4 @@ cd 05-polite-scraper
 pip install -r requirements.txt
 python main.py
 ```
+
