@@ -17,12 +17,13 @@ This repository contains the sequential progression from an in-memory CRUD API t
 
 ## Getting Started
 
-To run the current database-backed project:
+### Run the Containerized Stack (Assignment A3)
+Start the entire API and PostgreSQL database with one command:
 
 ```bash
-cd connect-crud-to-db
-pip install fastapi uvicorn
-uvicorn main:app --reload
+cd containerize-stack
+cp .env.example .env
+docker compose up --build
 ```
 
 Interactive API documentation will be available at:  
