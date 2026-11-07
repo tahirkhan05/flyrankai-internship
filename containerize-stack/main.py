@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
@@ -22,29 +23,38 @@ def get_db():
 
 def init_db():
     """Create tasks table if missing and seed starter tasks on empty count."""
-    with get_db() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id SERIAL PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    done BOOLEAN NOT NULL DEFAULT FALSE
-                )
-            """)
-            cursor.execute("SELECT COUNT(*) FROM tasks")
-            count = cursor.fetchone()["count"]
+    retries = 10
+    while retries > 0:
+        try:
+            with get_db() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS tasks (
+                            id SERIAL PRIMARY KEY,
+                            title TEXT NOT NULL,
+                            done BOOLEAN NOT NULL DEFAULT FALSE
+                        )
+                    """)
+                    cursor.execute("SELECT COUNT(*) FROM tasks")
+                    count = cursor.fetchone()["count"]
 
-            if count == 0:
-                seed_tasks = [
-                    ("Set up project", True),
-                    ("Build Stage 2 endpoints", False),
-                    ("Write documentation", False),
-                ]
-                cursor.executemany(
-                    "INSERT INTO tasks (title, done) VALUES (%s, %s)",
-                    seed_tasks,
-                )
-        conn.commit()
+                    if count == 0:
+                        seed_tasks = [
+                            ("Set up project", True),
+                            ("Build Stage 2 endpoints", False),
+                            ("Write documentation", False),
+                        ]
+                        cursor.executemany(
+                            "INSERT INTO tasks (title, done) VALUES (%s, %s)",
+                            seed_tasks,
+                        )
+                conn.commit()
+            break
+        except Exception as e:
+            retries -= 1
+            if retries == 0:
+                raise e
+            time.sleep(1)
 
 # Run database setup on startup
 init_db()
